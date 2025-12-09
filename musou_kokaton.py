@@ -72,6 +72,8 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.state = "normal"  # 状態の変数
+        self.hyper_life = 0  # 無敵状態の発動時間の変数
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -99,6 +101,11 @@ class Bird(pg.sprite.Sprite):
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
+        if self.state == "hyper":  # 無敵状態のときのみ
+            self.image = pg.transform.laplacian(self.image)  # 透明化
+            self.hyper_life -= 1  # 発動時間
+            if self.hyper_life < 0:  # 発動時間が無くなると通常の状態に戻る
+                self.state = "normal"
         screen.blit(self.image, self.rect)
 
 
@@ -232,7 +239,7 @@ class Score:
     def __init__(self):
         self.font = pg.font.Font(None, 50)
         self.color = (0, 0, 255)
-        self.value = 0
+        self.value = 10000
         self.image = self.font.render(f"Score: {self.value}", 0, self.color)
         self.rect = self.image.get_rect()
         self.rect.center = 100, HEIGHT-50
@@ -283,11 +290,19 @@ def main():
             score.value += 1  # 1点アップ
 
         for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
-            bird.change_img(8, screen)  # こうかとん悲しみエフェクト
-            score.update(screen)
-            pg.display.update()
-            time.sleep(2)
-            return
+            if bird.state != "hyper":  # 無敵状態でないならゲームオーバー
+                bird.change_img(8, screen)  # こうかとん悲しみエフェクト
+                score.update(screen)
+                pg.display.update()
+                time.sleep(2)
+                return
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            score.value += 1  # 1点アップ
+        
+        if key_lst[pg.K_RSHIFT] and score.value >= 100 and bird.state != "hyper":  # 右SHIFTを押している&スコアが100以上&現在無敵状態ではない
+            score.value -= 100  # スコアを100消費
+            bird.state = "hyper"  # 現在の状態を無敵状態に変更
+            bird.hyper_life = 500  # 発動時間
 
         bird.update(key_lst, screen)
         beams.update()
